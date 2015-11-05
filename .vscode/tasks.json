@@ -1,0 +1,6 @@
+// a task runner that runs a python program
+{
+	"version": "0.1.0",
+	"command": "python",
+	"args": ["${file}"]
+}

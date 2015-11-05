@@ -1,0 +1,22 @@
+{% extends "main.html" %}
+{% block content %}
+{% include "catalogNavbar.html" %}
+<div class="container">
+    <h3>{{catalog.name}} - {{catalog.description}}</h3>
+    <a href="{{url_for('showCategories', catalog_name = catalog.name)}}">Category Listing</a>
+    <ul>
+        {% for category in categories %}
+        <li><a href="{{url_for('showCategory', catalog_name = catalog.name, category_name = category.name)}}">{{category.name}}</a></li>
+        {% endfor %}
+    </ul>
+    <br />
+    <br />
+    <a href="{{url_for('listItems', catalog_name = catalog.name)}}">Item Listing</a>
+    <ul>
+        {% for item in items %}
+        <li><a href="{{url_for('showItem', catalog_name = catalog.name, item_name = item.name)}}">{{item.name}}</a></li>
+        {% endfor %}
+    </ul>    
+
+</div>
+{% endblock %}

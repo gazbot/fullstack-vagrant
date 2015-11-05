@@ -1,0 +1,24 @@
+{% extends "main.html" %}
+{% block content %}
+{% include "navbar.html" %}
+<div class="container">
+    <h3>{{catalog.name}} Category Listing</h3>
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>Category Name</th>
+                <th></th>
+                <th></th>
+            </tr>
+        </thead>
+        {% for category in categories %}
+        <tr>
+            <td><a href="{{url_for('showCategory', catalog_name = catalog.name, category_name = category.name)}}">{{category.name}}</a></td>
+            <td><a role="button" class="btn btn-primary btn-xs" href="{{url_for('editCategory', catalog_name = catalog.name, category_name = category.name)}}">Edit</a></td>
+            <td><a role="button" class="btn btn-danger btn-xs"  href="{{url_for('deleteCategory', catalog_name = catalog.name, category_name = category.name)}}">Delete</a></td>
+        </tr>
+        {% endfor %}
+    </table>
+    <a role="button" class="btn btn-success btn-xs" href="{{url_for('newCategory', catalog_name = catalog.name)}}">New Category</a>
+</div>
+{% endblock %}
