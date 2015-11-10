@@ -9,44 +9,21 @@ from sqlalchemy import create_engine
 Base = declarative_base()
 
 
-# User related objects
-class Person(Base):
-    __tablename__ = 'person'
-
-    person_id = Column(Integer, primary_key=True)
-    first_name = Column(String(250), nullable=False)
-    middle_name = Column(String(250))
-    last_name = Column(String(250), nullable=False)
-    gender = Column(String(250))
-    birth_date = Column(DateTime)
-
-    @property
-    def serialize(self):
-        """ Return object data in easily serializable format"""
-        return {
-            'person_id': self.person_id,
-            'first_name': self.first_name,
-            'middle_name': self.middle_name,
-            'last_name:': self.last_name,
-            'gender': self.gender,
-            'birth_date': self.birth_date
-        }
-
-
 class User(Base):
     __tablename__ = 'users'
 
     user_id = Column(Integer, primary_key=True)
-    email_address = Column(String(250), nullable=False)
-    person_id = Column(Integer, ForeignKey('person.person_id'))
-    person = relationship(Person)
+    username = Column(String(250), nullable=False)
+    email = Column(String(250), nullable=False)
+    picture = Column(String(250))
 
     @property
     def serialize(self):
         """Return object data in easily serializable format"""
         return {
             'user_id': self.user_id,
-            'email_address': self.username
+            'username': self.username#,
+            #'email': self.email
         }
 
 
@@ -56,7 +33,10 @@ class Catalog(Base):
     catalog_id = Column(Integer, primary_key=True)
     name = Column(String(250), nullable=False)
     description = Column(String(250), nullable=False)
-
+    creation_user_id = Column(Integer, ForeignKey('users.user_id'))
+    creation_user = relationship(User)
+    creation_date = Column(DateTime, default=datetime.datetime.utcnow)
+    
     @property
     def serialize(self):
         """Return object data in easily serializable format"""
@@ -75,7 +55,8 @@ class Category(Base):
     description = Column(String(250), nullable=True)
     catalog_id = Column(Integer, ForeignKey('catalog.catalog_id'))
     creation_user_id = Column(Integer, ForeignKey('users.user_id'))
-    modified_user_id = Column(Integer, ForeignKey('users.user_id'))
+    creation_user = relationship(User)
+    creation_date = Column(DateTime, default=datetime.datetime.utcnow)
 
     @property
     def serializable(self):
@@ -99,9 +80,8 @@ class Item(Base):
     name = Column(String(250), nullable=False)
     description = Column(String(250))
     creation_user_id = Column(Integer, ForeignKey('users.user_id'))
+    creation_user = relationship(User)
     creation_date = Column(DateTime, default=datetime.datetime.utcnow)
-    modified_user_id = Column(Integer, ForeignKey('users.user_id'))
-    modified_date = Column(DateTime, default=datetime.datetime.utcnow)
 
     @property
     def serialize(self):
