@@ -1,6 +1,6 @@
 {% extends "main.html" %}
 {% block content %}
-{% include "navbar.html" %}
+{% include "userNavbar.html" %}
 <div class="container">
     <h3>{{category.name}} Items</h3>
     <table class="table table-hover">
@@ -13,9 +13,9 @@
         </thead>
         {% for item in items %}
         <tr>
-            <td><a href="{{url_for('showItem', catalog_name = catalog.name, item_name = item.name)}}">{{item.name}}</a></td>
-            <td><a role="button" class="btn btn-primary btn-xs" href="{{url_for('editItem', catalog_name = catalog.name, item_name = item.name)}}">Edit</a></td>
-            <td><a role="button" class="btn btn-danger btn-xs"  href="{{url_for('deleteItem', catalog_name = catalog.name, item_name = item.name)}}">Delete</a></td>
+            <td><a href="{{url_for('showItem', item_name = item.name)}}">{{item.name}}</a></td>
+            <td><a role="button" class="btn btn-primary btn-xs" href="{{url_for('editItem', item_name = item.name)}}">Edit</a></td>
+            <td><a role="button" class="btn btn-danger btn-xs"  href="{{url_for('deleteItem', item_name = item.name)}}">Delete</a></td>
         </tr>
         {% endfor %}
     </table>

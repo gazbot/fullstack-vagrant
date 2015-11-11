@@ -1,6 +1,6 @@
 {% extends "main.html" %}
 {% block content %}
-{% include "navbar.html" %}
+{% include "userNavbar.html" %}
 <div class="container">
     <br />
     <h3>New Category</h3>
@@ -20,7 +20,7 @@
         <div class="form-group">
             <div class="col-sm-2-offset-2 col-sm-10">
                 <button type="submit" class="btn btn-primary">Save</button>
-                <a role="button" class="btn btn-default" href="{{url_for('showCategories', catalog_name = catalog.name)}}">Cancel</a>
+                <a role="button" class="btn btn-default" href="{{url_for('showCategories')}}">Cancel</a>
             </div>
         </div>
     </form>

@@ -1,12 +1,12 @@
 {% extends "main.html" %}
 {% block content %}
-{% include "userNavbar.html" %}
+{% include "publicNavbar.html" %}
 <div class="container">
-    <h3>Items</h3>
+    <h3>{{category.name}} Items</h3>
     <table class="table table-hover">
         <thead>
             <tr>
-                <th>Item Name</th>
+                <th>Items Name</th>
                 <th></th>
                 <th></th>
             </tr>
@@ -19,6 +19,5 @@
         </tr>
         {% endfor %}
     </table>
-    <a role="button" class="btn btn-success btn-xs" href="{{url_for('newItem')}}">New Item</a>
 </div>
 {% endblock %}
