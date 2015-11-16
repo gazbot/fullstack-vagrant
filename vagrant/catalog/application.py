@@ -50,7 +50,7 @@ Endpoints
 
 # Create anti-forgery state token
 @app.route('/login')
-def showLogin():
+def login():
     state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
     login_session['state'] = state
     # return "The current session state is %s" % login_session['state']
@@ -287,7 +287,6 @@ def newItem():
 # list orderBy / page / pageSize 
 @app.route('/items/')
 def listItems():
-    credentials = login_session.get('credentials')
     items = session.query(Item).all()
     if 'username' not in login_session:
         return render_template('publicItemList.html', items=items)
@@ -304,7 +303,6 @@ Category Section
 @app.route('/')
 @app.route('/categories')
 def showCategories():
-    credentials = login_session.get('credentials')
     categories = session.query(Category).all()
     if 'username' not in login_session:
         return render_template('publicCategoryList.html', categories=categories)
