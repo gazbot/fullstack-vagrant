@@ -178,7 +178,7 @@ def gdisconnect():
         # Only disconnect a connected user.
     if 'username' not in login_session:
         response = make_response(
-            json.dumps('Current user not connected.'), 401)
+            json.dumps('Current user not connected'), 401)
         response.headers['Content-Type'] = 'application/json'
         return response
     access_token = login_session.get('credentials')
