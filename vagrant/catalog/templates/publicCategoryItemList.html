@@ -14,8 +14,8 @@
         {% for item in items %}
         <tr>
             <td><a href="{{url_for('showItem', item_name = item.name)}}">{{item.name}}</a></td>
-            <td><a role="button" class="btn btn-primary btn-xs" href="{{url_for('editItem', item_name = item.name)}}">Edit</a></td>
-            <td><a role="button" class="btn btn-danger btn-xs"  href="{{url_for('deleteItem', item_name = item.name)}}">Delete</a></td>
+            <td></td>
+            <td></td>
         </tr>
         {% endfor %}
     </table>

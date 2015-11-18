@@ -57,8 +57,8 @@ def login():
     return render_template('login.html', STATE=state, CLIENT_ID=CLIENT_ID)
 
 
-@app.route('/gconnect', methods=['POST'])
-def gconnect():
+@app.route('/auth/google/connect', methods=['POST'])
+def googleConnect():
     # Validate state token
     if request.args.get('state') != login_session['state']:
         response = make_response(json.dumps('Invalid state parameter.'), 401)
@@ -173,8 +173,8 @@ def getUserID(email):
         return None
 
 
-@app.route('/gdisconnect')
-def gdisconnect():
+@app.route('/auth/google/disconnect')
+def googleDisconnect():
         # Only disconnect a connected user.
     if 'username' not in login_session:
         response = make_response(
@@ -203,7 +203,35 @@ def gdisconnect():
             json.dumps('Failed to revoke token for given user.', 400))
         response.headers['Content-Type'] = 'application/json'
         return response
+
+
+@app.route('/auth/logout')
+def userLogout():
+    state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+    login_session['state'] = state
+    if 'username' not in login_session:
+        return render_template('unauthorised.html', STATE=state, CLIENT_ID=CLIENT_ID)
+    else:
+        del login_session['credentials']
+        del login_session['gplus_id']
+        del login_session['username']
+        del login_session['email']
+        del login_session['picture']
+        return render_template('loggedOut.html', STATE=state, CLIENT_ID=CLIENT_ID)
         
+
+@app.route('/user/profile')
+def userProfile():
+    if 'username' not in login_session:
+        state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+        login_session['state'] = state
+        return render_template('unauthorised.html', STATE=state, CLIENT_ID=CLIENT_ID)
+    else:
+        email = login_session['email']
+        user_id = getUserID(email)
+        user = getUserInfo(user_id)
+        return render_template('userProfile.html', user=user)
+
 
 """
 Items Section
@@ -212,7 +240,9 @@ Items Section
 def showItem(item_name):
     item = session.query(Item).filter_by(name=item_name).one()
     if 'username' not in login_session:
-        return render_template('publicItemDisplay.html', item=item)
+        state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+        login_session['state'] = state
+        return render_template('publicItemDisplay.html', item=item, STATE=state, CLIENT_ID=CLIENT_ID)
     else:
         email = login_session['email']
         user_id = getUserID(email)
@@ -225,7 +255,9 @@ def showItem(item_name):
 def editItem(item_name):
     credentials = login_session.get('credentials')
     if 'username' not in login_session:
-        return render_template('unauthorised.html')
+        state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+        login_session['state'] = state
+        return render_template('unauthorised.html', STATE=state, CLIENT_ID=CLIENT_ID)
     else:
         email = login_session['email']
         user_id = getUserID(email)
@@ -248,7 +280,9 @@ def editItem(item_name):
 def deleteItem(item_name):
     credentials = login_session.get('credentials')
     if 'username' not in login_session:
-        return render_template('unauthorised.html')
+        state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+        login_session['state'] = state
+        return render_template('unauthorised.html', STATE=state, CLIENT_ID=CLIENT_ID)
     else:
         email = login_session['email']
         user_id = getUserID(email)
@@ -267,7 +301,9 @@ def deleteItem(item_name):
 def newItem():
     credentials = login_session.get('credentials')
     if 'username' not in login_session:
-        return render_template('unauthorised.html')
+        state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+        login_session['state'] = state
+        return render_template('unauthorised.html', STATE=state, CLIENT_ID=CLIENT_ID)
     else:
         email = login_session['email']
         user_id = getUserID(email)
@@ -280,7 +316,7 @@ def newItem():
             return redirect(url_for('listItems'))
         else:
             categories = session.query(Category).all()
-            return render_template('itemNew.html', categories=categories)
+            return render_template('itemNew.html', categories=categories, user=user)
     
 
 # List items, supports certain query parameters,
@@ -289,7 +325,9 @@ def newItem():
 def listItems():
     items = session.query(Item).all()
     if 'username' not in login_session:
-        return render_template('publicItemList.html', items=items)
+        state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+        login_session['state'] = state
+        return render_template('publicItemList.html', items=items, STATE=state, CLIENT_ID=CLIENT_ID)
     else:
         email = login_session['email']
         user_id = getUserID(email)
@@ -305,7 +343,9 @@ Category Section
 def showCategories():
     categories = session.query(Category).all()
     if 'username' not in login_session:
-        return render_template('publicCategoryList.html', categories=categories)
+        state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+        login_session['state'] = state
+        return render_template('publicCategoryList.html', categories=categories, STATE=state, CLIENT_ID=CLIENT_ID)
     else:
         email = login_session['email']
         user_id = getUserID(email)
@@ -316,7 +356,9 @@ def showCategories():
 @app.route('/categories/new/', methods=['GET', 'POST'])
 def newCategory():
     if 'username' not in login_session:
-        return render_template('unauthorised.html')
+        state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+        login_session['state'] = state
+        return render_template('unauthorised.html', STATE=state, CLIENT_ID=CLIENT_ID)
     else:
         email = login_session['email']
         user_id = getUserID(email)
@@ -334,7 +376,9 @@ def newCategory():
 @app.route('/category/<string:category_name>/edit/', methods=['GET', 'POST'])
 def editCategory(category_name):
     if 'username' not in login_session:
-        return render_template('unauthorised.html')
+        state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+        login_session['state'] = state
+        return render_template('unauthorised.html', STATE=state, CLIENT_ID=CLIENT_ID)
     else:
         email = login_session['email']
         user_id = getUserID(email)
@@ -354,7 +398,9 @@ def showCategory(category_name):
     showCategory = session.query(Category).filter_by(name=category_name).one()
     showItems = session.query(Item).filter_by(category_id = showCategory.category_id).all()
     if 'username' not in login_session:
-        return render_template('publicCategoryItemList.html', category=showCategory, items=showItems)
+        state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+        login_session['state'] = state
+        return render_template('publicCategoryItemList.html', category=showCategory, items=showItems, STATE=state, CLIENT_ID=CLIENT_ID)
     else:
         email = login_session['email']
         user_id = getUserID(email)
@@ -368,7 +414,9 @@ def showCategoryItems(category_name):
     showCategory = session.query(Category).filter_by(name=category_name).one()
     showItems = session.query(Item).filter_by(category_id = showCategory.category_id).all()
     if 'username' not in login_session:
-        return render_template('publicCategoryItemList.html', category=showCategory, items=showItems)
+        state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+        login_session['state'] = state
+        return render_template('publicCategoryItemList.html', category=showCategory, items=showItems, STATE=state, CLIENT_ID=CLIENT_ID)
     else:
         email = login_session['email']
         user_id = getUserID(email)
@@ -380,7 +428,9 @@ def showCategoryItems(category_name):
 @app.route('/category/<string:category_name>/delete/', methods=['GET', 'POST'])
 def deleteCategory(category_name):
     if 'username' not in login_session:
-        return render_template('unauthorised.html')
+        state = ''.join(random.choice(string.ascii_uppercase + string.digits) for x in xrange(32))
+        login_session['state'] = state
+        return render_template('unauthorised.html', STATE=state, CLIENT_ID=CLIENT_ID)
     else:
         category = session.query(Category).filter_by(name=category_name).one()
         if request.method == 'POST':

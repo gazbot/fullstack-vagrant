@@ -1,0 +1,27 @@
+{% extends "main.html" %}
+{% block content %}
+{% include "userNavbar.html" %}
+<div class="container">
+	<br />
+	<br />
+	<div class="row">
+  		<div class="col-md-8">
+    		<div class="panel panel-default">
+				<div class="panel-body">
+              		<div class="row">
+                    	<div class="col-xs-12 col-sm-4 text-center">
+							<img src="{{user.picture}}" alt="" class="center-block img-circle img-responsive"/>
+						</div>
+						<div class="col-xs-12 col-sm-18">
+							<h2>{{user.username}}</h2>
+						</div>
+						<div class="col-xs-12 col-sm-4">
+							<a class="btn btn-danger btn-block" href="{{url_for('googleDisconnect')}}"><span class="fa fa-gear"></span>Disconnect Google</a> 
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}

@@ -6,19 +6,18 @@
 </head>
 <body>  
 <!-- GOOGLE PLUS SIGN IN-->        
-          <div id="signInButton">
-          <span class="g-signin"
-            data-scope="openid email"
-            data-clientid="{{CLIENT_ID}}"
-            data-redirecturi="postmessage"
-            data-accesstype="offline"
-            data-cookiepolicy="single_host_origin"
-            data-callback="signInCallback"
-            data-approvalprompt="force">
-          </span>
-        </div>
-
-<div id="result"></div>
+  <div id="signInButton">
+    <span class="g-signin"
+          data-scope="openid email"
+          data-clientid="{{CLIENT_ID}}"
+          data-redirecturi="postmessage"
+          data-accesstype="offline"
+          data-cookiepolicy="single_host_origin"
+          data-callback="signInCallback"
+          data-approvalprompt="force">
+    </span>
+  </div>
+  <div id="result"></div>
 
 <script>
 function signInCallback(authResult) {
@@ -28,7 +27,7 @@ function signInCallback(authResult) {
     // Send the one-time-use code to the server, if the server responds, write a 'login successful' message to the web page and then redirect back to the main restaurants page
     $.ajax({
       type: 'POST',
-      url: '/gconnect?state={{STATE}}',
+      url: '/googleConnect?state={{STATE}}',
       processData: false,
       data: authResult['code'],
       contentType: 'application/octet-stream; charset=utf-8',

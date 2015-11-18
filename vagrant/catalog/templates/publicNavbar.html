@@ -15,24 +15,37 @@
                     <li class="dropdown">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">Categories <b class="caret"></b></a>
                         <ul class="dropdown-menu">
-                            <li><a href="{{url_for('newCategory')}}">New Category</a></li>
                             <li><a href="{{url_for('showCategories')}}">Category Listing</a></li>
                         </ul>
                     </li>
                     <li class="dropdown">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">Items <b class="caret"></b></a>
                         <ul class="dropdown-menu">
-                            <li><a href="{{url_for('newItem')}}">New Item</a></li>
                             <li><a href="{{url_for('listItems')}}">Item Listing</a></li>
                         </ul>
                     </li>
                 </ul>
                 <ul class="nav pull-right navbar-nav">
                     <li class="divider-vertical"></li>
+                    <div class="result"></div>
                     <li class="dropdown">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">Guest <b class="caret"></b></a>
                         <ul class="dropdown-menu">
-                            <li><a href="{{url_for('login')}}">Login</a></li>
+                            <div class="col-sm-12">
+                                <div class="col-sm-12">
+                                    <div id="signInButton">
+                                        <span class="g-signin"
+                                              data-scope="openid email"
+                                              data-clientid="{{CLIENT_ID}}"
+                                              data-redirecturi="postmessage"
+                                              data-accesstype="offline"
+                                              data-cookiepolicy="single_host_origin"
+                                              data-callback="signInCallback"
+                                              data-approvalprompt="force">
+                                        </span>
+                                    </div>
+                                </div>
+                             </div>
                         </ul>
                     </li>
                 </ul>
@@ -40,3 +53,32 @@
         </div>
     </div>
 </nav>
+<script>
+function signInCallback(authResult) {
+  if (authResult['code']) {
+    // Hide the sign-in button now that the user is authorized
+    $('#signinButton').attr('style', 'display: none');
+    // Send the one-time-use code to the server, if the server responds, write a 'login successful' message to the web page and then redirect back to the main restaurants page
+    $.ajax({
+      type: 'POST',
+      url: '/auth/google/connect?state={{STATE}}',
+      processData: false,
+      data: authResult['code'],
+      contentType: 'application/octet-stream; charset=utf-8',
+      success: function(result) {
+        // Handle or verify the server response if necessary.
+        if (result) {
+          $('#result').html('Login Successful!</br>'+ result + '</br>Redirecting...')
+          setTimeout(function() {
+           window.location.href = "/";
+          }, 4000);
+        } else if (authResult['error']) {
+          console.log('There was an error: ' + authResult['error']);
+        } else {
+          $('#result').html('Failed to make a server-side call. Check your configuration and console.');
+        }
+      }
+    });
+  } 
+}
+</script>
