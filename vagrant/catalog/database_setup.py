@@ -53,6 +53,8 @@ class Item(Base):
     category_id = Column(Integer, ForeignKey('category.category_id'))
     name = Column(String(250), nullable=False)
     description = Column(String(250))
+    price = Column(String(250))
+    picture_url = Column(String(250))
     creation_user_id = Column(Integer, ForeignKey('user.user_id'))
     creation_user = relationship(User)
     creation_date = Column(DateTime, default=datetime.datetime.utcnow)

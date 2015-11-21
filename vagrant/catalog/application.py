@@ -5,10 +5,12 @@ from database_setup import Base, Category, Item, User
 from flask import session as login_session
 from oauth2client.client import flow_from_clientsecrets
 from oauth2client.client import FlowExchangeError
+from werkzeug import secure_filename
 import httplib2
 import json
 import random
 import string
+import os
 from flask import make_response
 import requests
 
@@ -16,12 +18,16 @@ import requests
 # from flask import session as login_session
 # import random, string
 
-app = Flask(__name__)
-
 CLIENT_ID = json.loads(
     open('client_secrets.json', 'r').read())['web']['client_id']
 
 APPLICATION_NAME = "Udacity Item Catalog"
+UPLOAD_FOLDER = '/upload/images'
+ALLOWED_EXTENSIONS = set(['png','jpg','jpeg'])
+
+app = Flask(__name__)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
 
 engine = create_engine('sqlite:///itemcatalog.db')
 Base.metadata.bind = engine
@@ -173,6 +179,11 @@ def getUserID(email):
         return None
 
 
+def allowed_file(filename):
+    return '.' in filename and \
+        filename.rsplit('.',1)[1] in ALLOWED_EXTENSIONS
+
+
 @app.route('/auth/google/disconnect')
 def googleDisconnect():
         # Only disconnect a connected user.
@@ -233,6 +244,16 @@ def userProfile():
         return render_template('userProfile.html', user=user)
 
 
+@app.route('/upload', methods=['GET','POST'])
+def upload():
+    if request.method == 'POST':
+        file = request.files['file']
+        extension = os.path.splittext(file.filename)[1]
+        f_name = str(uuid.uuid4()) + extension
+        file.save(os.path.join(app.config['UPLOAD_FOLDER'], f_name))
+        return json.dumps({'filename':f_name})
+
+
 """
 Items Section
 """
@@ -265,6 +286,7 @@ def editItem(item_name):
         categories = session.query(Category).all()
         item = session.query(Item).filter_by(name=item_name).one()
         itemCategory = session.query(Category).filter_by(category_id=item.category_id).one()
+        owner = item.creation_user
         if request.method == 'POST':
             editItemCategory = session.query(Category).filter_by(name=request.form['category']).one()
             item.name = request.form['name']
@@ -272,7 +294,7 @@ def editItem(item_name):
             item.category_id = editItemCategory.category_id
             return redirect(url_for('showItem', item_name=item.name))
         else:
-            return render_template('itemEdit.html', categories=categories, item=item, itemCategory=itemCategory, user=user)  
+            return render_template('itemEdit.html', categories=categories, item=item, itemCategory=itemCategory, user=user, owner=owner)  
   
   
 # Deletes the named item, displays confirmation page before removal 
@@ -291,7 +313,7 @@ def deleteItem(item_name):
         if request.method == 'POST':
             session.delete(itemToDelete)
             session.commit()
-            return redirect(url_for('listItems'))
+            return redirect(url_for('listItems'), user=user)
         else:
             return render_template('itemDelete.html', item=itemToDelete)
 
@@ -309,8 +331,12 @@ def newItem():
         user_id = getUserID(email)
         user = getUserInfo(user_id)
         if request.method == 'POST':
+            if request.form.get('filePath') is None:
+                picture_path = '/static/images/blank.png'
+            else:
+                picture_path = request.form.get('filePath')
             category = session.query(Category).filter_by(name=request.form['category']).one()
-            item = Item(name=request.form['name'], description=request.form['description'], category_id=category.category_id)
+            item = Item(name=request.form['name'], description=request.form['description'], category_id=category.category_id, creation_user = user, picture_url = picture_path)
             session.add(item)
             session.commit()
             return redirect(url_for('listItems'))
