@@ -4,7 +4,7 @@
 <div class="container">
     <br />
     <h3>New Item</h3>
-    <form role="form" class="form-horizontal" action="#" method="post">
+    <form role="form" class="form-horizontal" action="#" method="post" enctype="multipart/form-data">
         <div class="form-group">
             <label class="col-sm-2 control-label" for="name">Name</label>
             <div class="col-sm-10">
@@ -29,24 +29,15 @@
             </div>
         </div>
         <div class="form-group">
-            <label class="col-sm-2 control-label" for="amount">Amount (dollars)</label>
-            <div class="col-sm-4 input-group">
-                <p> </p>
-                <div class="input-group-addon">$</div>
-                <input type="text" class="form-control" id="amount" placeholder="Amount">
-                <div class="input-group-addon">.00</div>
-            </div>
-        </div>
-        <div class="form-group">
-            <label class="col-sm-2 control-label" for="file_source">Picture</label>
+            <label class="col-sm-2 control-label" for="file">Picture</label>
             <div class="input-group">
                 <div style="position:relative;">
                     <a class='btn btn-primary' href='javascript:;'>
                         Choose File...
-                        <input type="file" style='position:absolute;z-index:2;top:0;left:0;filter: alpha(opacity=0);-ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=0)";opacity:0;background-color:transparent;color:transparent;' name="file_source" size="40"  onchange='$("#upload-file-info").html($(this).val());'>
+                        <input type="file" required="true" style='position:absolute;z-index:2;top:0;left:0;filter: alpha(opacity=0);-ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=0)";opacity:0;background-color:transparent;color:transparent;' name="file" size="40" '>
                     </a>
                     &nbsp;
-                    <span class='label label-info' id="upload-file-info"></span>
+                    <span class='label label-info' id="file"></span>
                 </div>
             </div>
         </div>

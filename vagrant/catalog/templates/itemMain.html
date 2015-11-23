@@ -26,31 +26,6 @@
         });
     </script>
 	<script src="/static/js/jquery.ui.widget.js"></script>
-	
-	<script type="text/javascript" src="/static/js/jquery.fileupload.js"></script>
-	<script type="text/javascript" src="/static/js/jquery.fileupload-process.js"></script>
-	<script type="text/javascript" src="/static/js/jquery.fileupload-ui.js"></script>
-	<script>
-		$(function(){
-			    $('#fileupload').fileupload({
-        			url: 'upload',
-        			dataType: 'json',
-        			add: function (e, data) {
-        				data.submit();
-        			},
-			        success:function(response,status) {
-					   console.log(response.filename);
-					   var filePath = '/upload/images/' + response.filename;
-					   $('#imgUpload').attr('src',filePath);
-					   $('#filePath').val(filePath);
-			           console.log('success');
-			        },
-			        error:function(error){
-			        	console.log(error);
-			        }
-    			});
-		})
-	</script>
     <style>
     body {
         padding-top: 40px; /* offset the navbar */
@@ -108,26 +83,25 @@
     {
         margin: 0 0 11px;
     }
-        .btn-file {
-            position: relative;
-            overflow: hidden;
-        }
-         
-        .btn-file input[type=file] {
-            position: absolute;
-            top: 0;
-            right: 0;
-            min-width: 100%;
-            min-height: 100%;
-            font-size: 100px;
-            text-align: right;
-            filter: alpha(opacity=0);
-            opacity: 0;
-            outline: none;
-            background: white;
-            cursor: inherit;
-            display: block;
-        }
+    .btn-file {
+        position: relative;
+        overflow: hidden;
+    }
+    .btn-file input[type=file] {
+        position: absolute;
+        top: 0;
+        right: 0;
+        min-width: 100%;
+        min-height: 100%;
+        font-size: 100px;
+        text-align: right;
+        filter: alpha(opacity=0);
+        opacity: 0;
+        outline: none;
+        background: white;
+        cursor: inherit;
+        display: block;
+    }
     </style>
     <link rel="apple-touch-icon-precomposed" sizes="144x144" href="/static/ico/apple-touch-icon-144-precomposed.png">
     <link rel="apple-touch-icon-precomposed" sizes="114x144" href="/static/ico/apple-touch-icon-114-precomposed.png">
@@ -137,7 +111,6 @@
 </head>
 <body>
     {% block content %}
-    {% endblock %}
-    <!-- put these at the bottom so the page loads quicker -->
+    {% endblock %}\
 </body>
 </html>

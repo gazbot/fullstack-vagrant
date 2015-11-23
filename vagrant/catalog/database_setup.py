@@ -53,7 +53,6 @@ class Item(Base):
     category_id = Column(Integer, ForeignKey('category.category_id'))
     name = Column(String(250), nullable=False)
     description = Column(String(250))
-    price = Column(String(250))
     picture_url = Column(String(250))
     creation_user_id = Column(Integer, ForeignKey('user.user_id'))
     creation_user = relationship(User)
@@ -64,13 +63,12 @@ class Item(Base):
         """Return object data in easily serializable format"""
         return {
             'name': self.name,
-            'item_id': self.item_id,
             'description': self.description,
+            'picture_url': self.picture_url,
+            'item_id': self.item_id,
             'category_id': self.category_id,
             'creation_user': self.creation_user_id,
-            'creation_date': self.creation_date,
-            'modified_user': self.modified_user_id,
-            'modified_date': self.modified_date
+            'creation_date': self.creation_date
         }
 
 engine = create_engine('sqlite:///itemcatalog.db')

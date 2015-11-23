@@ -11,6 +11,7 @@ import json
 import random
 import string
 import os
+import uuid
 from flask import make_response
 import requests
 
@@ -22,7 +23,7 @@ CLIENT_ID = json.loads(
     open('client_secrets.json', 'r').read())['web']['client_id']
 
 APPLICATION_NAME = "Udacity Item Catalog"
-UPLOAD_FOLDER = '/upload/images'
+UPLOAD_FOLDER = 'static/upload'
 ALLOWED_EXTENSIONS = set(['png','jpg','jpeg'])
 
 app = Flask(__name__)
@@ -244,16 +245,6 @@ def userProfile():
         return render_template('userProfile.html', user=user)
 
 
-@app.route('/upload', methods=['GET','POST'])
-def upload():
-    if request.method == 'POST':
-        file = request.files['file']
-        extension = os.path.splittext(file.filename)[1]
-        f_name = str(uuid.uuid4()) + extension
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], f_name))
-        return json.dumps({'filename':f_name})
-
-
 """
 Items Section
 """
@@ -313,9 +304,9 @@ def deleteItem(item_name):
         if request.method == 'POST':
             session.delete(itemToDelete)
             session.commit()
-            return redirect(url_for('listItems'), user=user)
+            return redirect(url_for('listItems'))
         else:
-            return render_template('itemDelete.html', item=itemToDelete)
+            return render_template('itemDelete.html', user=user, item=itemToDelete)
 
 
 # Creates a new item
@@ -331,12 +322,18 @@ def newItem():
         user_id = getUserID(email)
         user = getUserInfo(user_id)
         if request.method == 'POST':
-            if request.form.get('filePath') is None:
+            file = request.files['file']
+            if file is None:
                 picture_path = '/static/images/blank.png'
             else:
-                picture_path = request.form.get('filePath')
+                extension = os.path.splitext(file.filename)[1]
+                f_name = str(uuid.uuid4()) + extension
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], f_name))
+                picture_path = '/static/upload/' + f_name
             category = session.query(Category).filter_by(name=request.form['category']).one()
-            item = Item(name=request.form['name'], description=request.form['description'], category_id=category.category_id, creation_user = user, picture_url = picture_path)
+            item = Item(name=request.form['name'], description=request.form['description'], 
+                        category_id=category.category_id, creation_user = user,
+                        picture_url = picture_path)
             session.add(item)
             session.commit()
             return redirect(url_for('listItems'))
