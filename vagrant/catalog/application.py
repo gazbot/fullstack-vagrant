@@ -279,11 +279,14 @@ def editItem(item_name):
         itemCategory = session.query(Category).filter_by(category_id=item.category_id).one()
         owner = item.creation_user
         if request.method == 'POST':
-            editItemCategory = session.query(Category).filter_by(name=request.form['category']).one()
-            item.name = request.form['name']
-            item.description = request.form['description']
-            item.category_id = editItemCategory.category_id
-            return redirect(url_for('showItem', item_name=item.name))
+            if owner.user_id != user.user_id:
+                return redirect(url_for('unauthorised.html'), STATE=state, CLIENT_ID=CLIENT_ID)
+            else:
+                editItemCategory = session.query(Category).filter_by(name=request.form['category']).one()
+                item.name = request.form['name']
+                item.description = request.form['description']
+                item.category_id = editItemCategory.category_id
+                return redirect(url_for('showItem', item_name=item.name))
         else:
             return render_template('itemEdit.html', categories=categories, item=item, itemCategory=itemCategory, user=user, owner=owner)  
   
@@ -301,10 +304,14 @@ def deleteItem(item_name):
         user_id = getUserID(email)
         user = getUserInfo(user_id)
         itemToDelete = session.query(Item).filter_by(name=item_name).one()
+        owner = itemToDelete.creation_user
         if request.method == 'POST':
-            session.delete(itemToDelete)
-            session.commit()
-            return redirect(url_for('listItems'))
+            if owner.user_id != user.user_id:
+                return redirect(url_for('unauthorised.html'), STATE=state, CLIENT_ID=CLIENT_ID)
+            else:
+                session.delete(itemToDelete)
+                session.commit()
+                return redirect(url_for('listItems'))
         else:
             return render_template('itemDelete.html', user=user, item=itemToDelete)
 
@@ -407,10 +414,14 @@ def editCategory(category_name):
         user_id = getUserID(email)
         user = getUserInfo(user_id)
         editedCategory = session.query(Category).filter_by(name=category_name).one()
+        owner = editedCategory.creation_user
         if request.method == 'POST':
-            editedCategory.name = request.form['name']
-            editedCategory.description = request.form['description']
-            return redirect(url_for('showCategories'))
+            if owner.user_id != user.user_id:
+                return redirect(url_for('unauthorised.html'), STATE=state, CLIENT_ID=CLIENT_ID)
+            else:
+                editedCategory.name = request.form['name']
+                editedCategory.description = request.form['description']
+                return redirect(url_for('showCategories'))
         else:
             return render_template('categoryEdit.html', category=editedCategory, user=user)
 
@@ -456,14 +467,18 @@ def deleteCategory(category_name):
         return render_template('unauthorised.html', STATE=state, CLIENT_ID=CLIENT_ID)
     else:
         category = session.query(Category).filter_by(name=category_name).one()
+        owner = category.creation_user
+        email = login_session['email']
+        user_id = getUserID(email)
+        user = getUserInfo(user_id)
         if request.method == 'POST':
-            session.delete(category)
-            session.commit()
-            return redirect(url_for('showCategories'))
+            if owner.user_id != user.user_id:
+                return redirect(url_for('unauthorised.html'), STATE=state, CLIENT_ID=CLIENT_ID)
+            else:
+                session.delete(category)
+                session.commit()
+                return redirect(url_for('showCategories'))
         else:
-            email = login_session['email']
-            user_id = getUserID(email)
-            user = getUserInfo(user_id)
             return render_template('categoryDelete.html', category=category, user=user)
 
 
