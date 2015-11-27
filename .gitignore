@@ -1,3 +1,5 @@
 .vscode
+.ropeproject
 .DS_Store
 .pyc
+.swp
