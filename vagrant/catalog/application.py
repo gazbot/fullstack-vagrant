@@ -243,7 +243,26 @@ def showItem(item_name):
     item = session.query(Item).filter_by(name=item_name).one()
     if request.headers['Content-Type'] == 'application/json':
         return jsonify(item=item.serialize)
-
+    if request.headers['Content-Type'] == 'text/xml':
+        responseXml = '<?xml version="1.0" encoding="UTF-8" ?>\n'
+        itemXml = "<item>\n\t<name>%(name)s</name>\n\t"
+        itemXml += "<description>%(description)s</description>\n\t"
+        itemXml += "<picture_url>%(picture_url)s</picture_url>\n\t"
+        itemXml += "<category_id>%(category_id)s</category_id>\n\t"
+        itemXml += "<creation_user_id>%(creation_user_id)s</creation_user_id>"
+        itemXml += "\n\t\t<creation_date>%(creation_date)s</creation_date>\n"
+        itemXml += "</item>"
+        data = {'item_id': item.item_id,
+                'name': item.name,
+                'description': item.description,
+                'picture_url': item.picture_url,
+                'category_id': item.category_id,
+                'creation_user_id': item.creation_user_id,
+                'creation_date': item.creation_date}
+        responseXml += itemXml % data
+        response = make_response(responseXml, 200)
+        response.headers['Content-Type'] = 'text/xml'
+        return response
     if 'username' not in login_session:
         state = ''.join(random.choice
                         (string.ascii_uppercase + string.digits)
@@ -390,12 +409,12 @@ def listItems():
     if request.headers['Content-Type'] == 'application/json':
         return jsonify(items=[i.serialize for i in items])
     if request.headers['Content-Type'] == 'text/xml':
-        itemXmlTemplate = "\t<item>\n\t\t<name>%(name)s</name>\n\t\t"
-        itemXmlTemplate += "<description>%(description)s</description>\n\t\t"
-        itemXmlTemplate += "<picture_url>%(picture_url)s</picture_url>\n\t\t"
-        itemXmlTemplate += "<creation_user_id>%(creation_user_id)s</creation_user_id>\n\t\t"
-        itemXmlTemplate += "<creation_date>%(creation_date)s</creation_date>"
-        itemXmlTemplate += "\n\t</item>"
+        itemsXml = "\t<item>\n\t\t<name>%(name)s</name>\n\t\t"
+        itemsXml += "<description>%(description)s</description>\n\t\t"
+        itemsXml += "<picture_url>%(picture_url)s</picture_url>\n\t\t"
+        itemsXml += "<creation_user_id>%(creation_user_id)s</creation_user_id>"
+        itemsXml += "\n\t\t<creation_date>%(creation_date)s</creation_date>"
+        itemsXml += "\n\t</item>"
         responseXml = '<?xml version="1.0" encoding="UTF-8" ?>\n<items>\n'
         for item in items:
             data = {'item_id': item.item_id,
@@ -405,7 +424,7 @@ def listItems():
                     'category_id': item.category_id,
                     'creation_user_id': item.creation_user_id,
                     'creation_date': item.creation_date}
-            responseXml += itemXmlTemplate % data
+            responseXml += itemsXml % data
         responseXml += "</items>"
         response = make_response(responseXml, 200)
         response.headers['Content-Type'] = 'text/xml'
@@ -425,11 +444,6 @@ def listItems():
         user_id = getUserID(email)
         user = getUserInfo(user_id)
         return render_template('itemList.html', items=items, user=user)
-
-
-"""
-Category Section
-"""
 
 
 @app.route('/')
