@@ -20,7 +20,8 @@ class User(Base):
         return {
             'user_id': self.user_id,
             'username': self.username,
-            'email': self.email
+            'email': self.email,
+            'picture_url': self.picture
         }
 
 
@@ -34,14 +35,14 @@ class Category(Base):
     creation_date = Column(DateTime, default=datetime.datetime.utcnow)
 
     @property
-    def serializable(self):
+    def serialize(self):
         """Return object data in easily serializable format"""
         return {
             'category_id': self.category_id,
             'name': self.name,
             'description': self.description,
             'creation_user_id': self.creation_user_id,
-            'modified_user_id': self.modified_user_id
+            'creation_date': self.creation_date
         }
 
 
@@ -65,7 +66,7 @@ class Item(Base):
             'picture_url': self.picture_url,
             'item_id': self.item_id,
             'category_id': self.category_id,
-            'creation_user': self.creation_user_id,
+            'creation_user_id': self.creation_user_id,
             'creation_date': self.creation_date
         }
 
