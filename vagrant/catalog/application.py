@@ -18,7 +18,7 @@ import requests
 CLIENT_ID = json.loads(
     open('client_secrets.json', 'r').read())['web']['client_id']
 APPLICATION_NAME = "Udacity Item Catalog"
-UPLOAD_FOLDER = 'static/upload'
+UPLOAD_FOLDER = 'static/upload/'
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 MAX_CONTENT_LENGTH = 2 * 1024 * 1024
 
@@ -35,11 +35,566 @@ session = DBSession()
 # Login endpoint
 @app.route('/login')
 def login():
+    # generate a new random session state token
     state = ''.join(random.choice(string.ascii_uppercase + string.digits)
                     for x in xrange(32))
+    # set the state token to the newly generated state token
     login_session['state'] = state
     # return "The current session state is %s" % login_session['state']
     return render_template('login.html', STATE=state, CLIENT_ID=CLIENT_ID)
+
+
+# Current User Information endpoint
+@app.route('/user/profile')
+def userProfile():
+    if 'username' not in login_session:
+        # no username, generate a new random session state token
+        state = ''.join(random.choice
+                        (string.ascii_uppercase + string.digits)
+                        for x in xrange(32))
+        # set the state token to the newly generated state token
+        login_session['state'] = state
+        # no username as been set, access is restricted for this function
+        return render_template('unauthorised.html', STATE=state,
+                               CLIENT_ID=CLIENT_ID)
+    else:
+        # display profile information for the logged in user
+        email = login_session['email']
+        user_id = getUserID(email)
+        user = getUserInfo(user_id)
+        return render_template('userProfile.html', user=user)
+
+
+# Item Detail endpoint
+@app.route('/items/<item_name>/')
+def showItem(item_name):
+    item = session.query(Item).filter_by(name=item_name).one()
+    # the request specifies JSON as the desired response
+    if request.headers['Content-Type'] == 'application/json':
+        # JSONify the data
+        jsonResponse = jsonify(item=item.serialize)
+        # add the JSON data to the response with status OK
+        response = make_response(jsonResponse, 200)
+        # set the response header to JSON
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    # the request specifies XML as the desired response
+    if request.headers['Content-Type'] == 'text/xml':
+        # standard XML header
+        xml = '<?xml version="1.0" encoding="UTF-8" ?>\n'
+        # define the XML template for a single item
+        xmlItem = "<item>\n\t<name>%(name)s</name>\n\t"
+        xmlItem += "<description>%(description)s</description>\n\t"
+        xmlItem += "<picture_url>%(picture_url)s</picture_url>\n\t"
+        xmlItem += "<category_id>%(category_id)s</category_id>\n\t"
+        xmlItem += "<creation_user_id>%(creation_user_id)s</creation_user_id>"
+        xmlItem += "\n\t\t<creation_date>%(creation_date)s</creation_date>\n"
+        xmlItem += "</item>"
+        # bind the data from the item class to use in the template
+        itemData = {'item_id': item.item_id,
+                    'name': item.name,
+                    'description': item.description,
+                    'picture_url': item.picture_url,
+                    'category_id': item.category_id,
+                    'creation_user_id': item.creation_user_id,
+                    'creation_date': item.creation_date}
+        # combine the template xml with the item data and add to
+        # the XML
+        xml += xmlItem % itemData
+        # add the XML to the response and set to be OK
+        response = make_response(xml, 200)
+        # set the content type of the response to be XML
+        response.headers['Content-Type'] = 'text/xml'
+        return response
+    if 'username' not in login_session:
+        # no username, generate a new random session state token
+        state = ''.join(random.choice
+                        (string.ascii_uppercase + string.digits)
+                        for x in xrange(32))
+        # set the state token to the newly generated state token
+        login_session['state'] = state
+        # no username as been set, display the public version
+        return render_template('publicItemDisplay.html', item=item,
+                               STATE=state, CLIENT_ID=CLIENT_ID)
+    else:
+        # username has been set, set the required values for the navbar
+        email = login_session['email']
+        user_id = getUserID(email)
+        user = getUserInfo(user_id)
+        # display the user only version of the page
+        return render_template('itemDisplay.html', item=item, user=user)
+
+
+# Edit Item endpoint
+@app.route('/items/<item_name>/edit/', methods=['GET', 'POST'])
+def editItem(item_name):
+    if 'username' not in login_session:
+        # no username, generate a new random session state token
+        state = ''.join(random.choice
+                        (string.ascii_uppercase + string.digits)
+                        for x in xrange(32))
+        # set the state token to the newly generated state token
+        login_session['state'] = state
+        # no username as been set, access restricted
+        return render_template('unauthorised.html', STATE=state,
+                               CLIENT_ID=CLIENT_ID)
+    else:
+        # get current user information
+        email = login_session['email']
+        user_id = getUserID(email)
+        user = getUserInfo(user_id)
+        # collect the data specified in the URL from the DB
+        categories = session.query(Category).all()
+        item = session.query(Item).filter_by(name=item_name).one()
+        itemCategory = session.query(Category).filter_by(
+            category_id=item.category_id).one()
+        owner = item.creation_user
+
+        # check current user is authorized to edit the item
+        if login_session['user_id'] != item.creation_user.user_id:
+            # current user is not the use who created this item, prevent
+            # deletion and alert the current user.
+            responseScript = "<script>function myFunction() {alert('"
+            responseScript += "You are not authorized to edit this item."
+            responseScript += "');}</script><body onload='myFunction()''>"
+            return responseScript
+
+        # current user has passed authorization check
+        if request.method == 'POST':
+            # set the item values from the request form
+            editItemCategory = session.query(Category).filter_by(
+                name=request.form['category']).one()
+            item.name = request.form['name']
+            item.description = request.form['description']
+            item.category_id = editItemCategory.category_id
+            return redirect(url_for('showItem', item_name=item.name))
+        else:
+            # display the edit item template
+            return render_template('itemEdit.html', categories=categories,
+                                   item=item, itemCategory=itemCategory,
+                                   user=user, owner=owner)
+
+
+# Delete Item endpoint
+@app.route('/items/<item_name>/delete/', methods=['GET', 'POST'])
+def deleteItem(item_name):
+    if 'username' not in login_session:
+        # no username, generate a new random session state token
+        state = ''.join(random.choice
+                        (string.ascii_uppercase + string.digits)
+                        for x in xrange(32))
+        # set the state token to the newly generated state token
+        login_session['state'] = state
+        # no username as been set, access restricted
+        return render_template('unauthorised.html', STATE=state,
+                               CLIENT_ID=CLIENT_ID)
+    else:
+        # obtain user details
+        email = login_session['email']
+        user_id = getUserID(email)
+        user = getUserInfo(user_id)
+        # obtain item information
+        itemToDelete = session.query(Item).filter_by(name=item_name).one()
+        # confirm the user is allowed to delete this item
+        if login_session['user_id'] != itemToDelete.creation_user.user_id:
+            # current user is not the use who created this item, prevent
+            # deletion and alert the current user.
+            responseScript = "<script>function myFunction() {alert('"
+            responseScript += "You are not authorized to delete this item."
+            responseScript += "');}</script><body onload='myFunction()''>"
+            return responseScript
+
+        if request.method == 'POST':
+            # current user created the item, proceed to delete.
+            session.delete(itemToDelete)
+            session.commit()
+            return redirect(url_for('listItems'))
+        else:
+            # display the confirmation of deletion template to user.
+            return render_template('itemDelete.html', user=user,
+                                   item=itemToDelete)
+
+
+# New Item endpoint
+@app.route('/items/new/', methods=['GET', 'POST'])
+def newItem():
+    if 'username' not in login_session:
+        # no username, generate a new random session state token
+        state = ''.join(random.choice
+                        (string.ascii_uppercase + string.digits)
+                        for x in xrange(32))
+        # set the state token to the newly generated state token
+        login_session['state'] = state
+        # no username as been set, access is restricted for this function
+        return render_template('unauthorised.html', STATE=state,
+                               CLIENT_ID=CLIENT_ID)
+    else:
+        # collect user details from login session
+        email = login_session['email']
+        user_id = getUserID(email)
+        user = getUserInfo(user_id)
+        if request.method == 'POST':
+            # collect the file information from request
+            file = request.files['file']
+            if file is None and not allowedFile(file.filename):
+                # no image provided or invalid extension
+                # use the default blank image
+                picture_path = '/static/images/blank.png'
+            else:
+                # grab the extension of the file
+                extension = os.path.splitext(file.filename)[1]
+                # create a unique filename (UUID/GUID)
+                f_name = str(uuid.uuid4()) + extension
+                # save the new filename with the original extension
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], f_name))
+                # path of the picture to use for the template
+                picture_path = '/' + app.config['UPLOAD_FOLDER'] + f_name
+
+            # find the matching category from the picklist
+            category = session.query(Category).filter_by(
+                name=request.form['category']).one()
+            # create the new item with appropriate values
+            item = Item(name=request.form['name'],
+                        description=request.form['description'],
+                        category_id=category.category_id,
+                        creation_user=user,
+                        picture_url=picture_path)
+            # save the newly created item.
+            session.add(item)
+            session.commit()
+            # item added, go back and display the list of items
+            return redirect(url_for('listItems'))
+        else:
+            # query the database and get all categories to display in picklist
+            categories = session.query(Category).all()
+            # display the new item template
+            return render_template('itemNew.html',
+                                   categories=categories,
+                                   user=user)
+
+
+# Item List endpoint
+@app.route('/items/')
+def listItems():
+    items = session.query(Item).all()
+    # the request specifies JSON as the desired response
+    if request.headers['Content-Type'] == 'application/json':
+        # JSONify the data
+        jsonResponse = jsonify(items=[i.serialize for i in items])
+        # add the JSON data to the response with status OK
+        response = make_response(jsonResponse, 200)
+        # set the response header to JSON
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    # the request specifies XML as the desired response
+    if request.headers['Content-Type'] == 'text/xml':
+        # standard XML header
+        xml = '<?xml version="1.0" encoding="UTF-8" ?>\n'
+        # open the items XML tag
+        xml += '<items>\n'
+        # item XML template
+        itemsXml = "\t<item>\n\t\t<name>%(name)s</name>\n\t\t"
+        itemsXml += "<description>%(description)s</description>\n\t\t"
+        itemsXml += "<picture_url>%(picture_url)s</picture_url>\n\t\t"
+        itemsXml += "<creation_user_id>%(creation_user_id)s</creation_user_id>"
+        itemsXml += "\n\t\t<creation_date>%(creation_date)s</creation_date>"
+        itemsXml += "\n\t</item>"
+        # iterate through all of the items
+        for item in items:
+            # bind the item to use in a template
+            itemData = {'item_id': item.item_id,
+                        'name': item.name,
+                        'description': item.description,
+                        'picture_url': item.picture_url,
+                        'category_id': item.category_id,
+                        'creation_user_id': item.creation_user_id,
+                        'creation_date': item.creation_date}
+            # merge the item data with the template and add to the XML
+            xml += itemsXml % itemData
+
+        # finished adding items so the tag can be closed
+        xml += "</items>"
+        # XML is complete, create the response and add the XML
+        response = make_response(xml, 200)
+        # set the response header for XML so it is interpreted correctly
+        response.headers['Content-Type'] = 'text/xml'
+        return response
+
+    if 'username' not in login_session:
+        # no username, generate a new random session state token
+        state = ''.join(random.choice
+                        (string.ascii_uppercase + string.digits)
+                        for x in xrange(32))
+        # set the state token to the newly generated state token
+        login_session['state'] = state
+        # no username as been set, display public access to page
+        return render_template('publicItemList.html', items=items,
+                               STATE=state, CLIENT_ID=CLIENT_ID)
+    else:
+        email = login_session['email']
+        user_id = getUserID(email)
+        user = getUserInfo(user_id)
+        return render_template('itemList.html', items=items, user=user)
+
+
+# Default route, category listing
+@app.route('/')
+@app.route('/categories')
+def showCategories():
+    categories = session.query(Category).all()
+    # the request specifies JSON as the desired response
+    if request.headers['Content-Type'] == 'application/json':
+        # JSONify the data
+        jsonResponse = jsonify(categories=[c.serialize for c in categories])
+        # add the JSON data to the response with status OK
+        response = make_response(jsonResponse, 200)
+        # set the response header to JSON
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    # the request specifies XML as the desired response
+    if request.headers['Content-Type'] == 'text/xml':
+        # standard XML template
+        xml = '<?xml version="1.0" encoding="UTF-8" ?>\n'
+        # open the categories tag
+        xml += '<categories>\n'
+        # category XML template
+        catXml = '\t<category>\n'
+        catXml += '\t\t<category_id>%(category_id)s</category_id>\n'
+        catXml += '\t\t<name>%(name)s</name>\n'
+        catXml += '\t\t<description>%(description)s</description>\n'
+        catXml += '\t\t<creation_user_id>%(user_id)s</creation_user_id>\n'
+        catXml += '\t\t<creation_date>%(creation_date)s</creation_date>\n'
+        catXml += '\t</category>\n'
+        # iterate through the categories
+        for category in categories:
+            # bind the category data
+            catData = {'category_id': category.category_id,
+                       'name': category.name,
+                       'description': category.description,
+                       'user_id': category.creation_user_id,
+                       'creation_date': category.creation_date}
+            # merge the data with the XML template and add to the XML
+            xml += catXml % catData
+
+        # finished adding categories so the tag can be closed
+        xml += '</categories>\n'
+        # XML is complete, create the response and add the XML
+        response = make_response(xml, 200)
+        # set the response header for the XML so it is interpreted correctly
+        response.headers['Content-Type'] = 'text/xml'
+        return response
+
+    if 'username' not in login_session:
+        # no username, generate a new random session state token
+        state = ''.join(random.choice
+                        (string.ascii_uppercase + string.digits)
+                        for x in xrange(32))
+        # set the state token to the newly generated state token
+        login_session['state'] = state
+        # no username as been set, display public access to page
+        return render_template('publicCategoryList.html',
+                               categories=categories, STATE=state,
+                               CLIENT_ID=CLIENT_ID)
+    else:
+        email = login_session['email']
+        user_id = getUserID(email)
+        user = getUserInfo(user_id)
+        return render_template('categoryList.html',
+                               categories=categories,
+                               user=user)
+
+
+# New Category endpoint
+@app.route('/categories/new/', methods=['GET', 'POST'])
+def newCategory():
+    if 'username' not in login_session:
+        # no username, generate a new random session state token
+        state = ''.join(random.choice
+                        (string.ascii_uppercase + string.digits)
+                        for x in xrange(32))
+        # set the state token to the newly generated state token
+        login_session['state'] = state
+        # no username as been set, access is restricted
+        return render_template('unauthorised.html', STATE=state,
+                               CLIENT_ID=CLIENT_ID)
+    else:
+        # obtain the logged in users information
+        email = login_session['email']
+        user_id = getUserID(email)
+        user = getUserInfo(user_id)
+        if request.method == 'POST':
+            # create the new category
+            newCategory = Category(name=request.form['name'],
+                                   description=request.form['description'])
+            session.add(newCategory)
+            session.commit()
+            return redirect(url_for('showCategories'))
+        else:
+            # display the new category template
+            return render_template('categoryNew.html', user=user)
+
+
+# Edit Category endpoint
+@app.route('/category/<string:category_name>/edit/', methods=['GET', 'POST'])
+def editCategory(category_name):
+    if 'username' not in login_session:
+        # no username, generate a new random session state token
+        state = ''.join(random.choice
+                        (string.ascii_uppercase + string.digits)
+                        for x in xrange(32))
+        # set the state token to the newly generated state token
+        login_session['state'] = state
+        # no username as been set, access is restricted.
+        return render_template('unauthorised.html', STATE=state,
+                               CLIENT_ID=CLIENT_ID)
+    else:
+        email = login_session['email']
+        user_id = getUserID(email)
+        user = getUserInfo(user_id)
+        editedCategory = session.query(
+            Category).filter_by(name=category_name).one()
+
+        if login_session['user_id'] != editedCategory.creation_user.user_id:
+            # current user is not the use who created this item, prevent
+            # deletion and alert the current user.
+            responseScript = "<script>function myFunction() {alert('"
+            responseScript += "You are not authorized to edit this category."
+            responseScript += "');}</script><body onload='myFunction()''>"
+            return responseScript
+
+        if request.method == 'POST':
+            # save the category with the newly provided values
+            editedCategory.name = request.form['name']
+            editedCategory.description = request.form['description']
+            return redirect(url_for('showCategories'))
+        else:
+            # display the edit category template
+            return render_template('categoryEdit.html',
+                                   category=editedCategory, user=user)
+
+
+# Category Items endpoint
+@app.route('/category/<string:category_name>/')
+def showCategory(category_name):
+    showCategory = session.query(Category).filter_by(name=category_name).one()
+    showItems = session.query(Item).filter_by(
+        category_id=showCategory.category_id).all()
+    # the request specifies JSON as the desired response
+    if request.headers['Content-Type'] == 'application/json':
+        # JSONify the data
+        jsonResponse = jsonify(category=showCategory.serialize,
+                               items=[i.serialize for i in showItems])
+        # add the JSON data to the response with status OK
+        response = make_response(jsonResponse, 200)
+        # set the response header to JSON
+        response.headers['Content-Type'] = 'application/json'
+        return response
+
+    # the request specifies XML as the desired response
+    if request.headers['Content-Type'] == 'text/xml':
+        # standard XML header
+        xml = '<?xml version="1.0" encoding="UTF-8" ?>\n'
+
+        # singular category XML template
+        catXml = '<category>\n'
+        catXml += '\t<category_id>%(category_id)s</category_id>\n'
+        catXml += '\t<name>%(name)s</name>\n'
+        catXml += '\t<description>%(description)s</description>\n'
+        catXml += '\t<creation_user_id>%(user_id)s</creation_user_id>\n'
+        catXml += '\t<creation_date>%(creation_date)s</creation_date>\n'
+        catXml += '\t<items>\n'
+
+        itemXml = "\t<item>\n\t\t<name>%(name)s</name>\n\t\t"
+        itemXml += "<description>%(description)s</description>\n\t\t"
+        itemXml += "<picture_url>%(picture_url)s</picture_url>\n\t\t"
+        itemXml += "<creation_user_id>%(creation_user_id)s</creation_user_id>"
+        itemXml += "\n\t\t<creation_date>%(creation_date)s</creation_date>"
+        itemXml += "\n\t</item>"
+        # bind the category data for use in template
+        catData = {'category_id': showCategory.category_id,
+                   'name': showCategory.name,
+                   'description': showCategory.description,
+                   'user_id': showCategory.creation_user_id,
+                   'creation_date': showCategory.creation_date}
+        # merge the category data with the xml template into xml response
+        xml += catXml % catData
+
+        # iterate through each item and add it to the xml response
+        for item in showItems:
+            itemData = {'item_id': item.item_id,
+                        'name': item.name,
+                        'description': item.description,
+                        'picture_url': item.picture_url,
+                        'category_id': item.category_id,
+                        'creation_user_id': item.creation_user_id,
+                        'creation_date': item.creation_date}
+            # merge the item data with the template and add to xml
+            xml += itemXml % itemData
+
+        # close off the item and category tags
+        xml += '\t</items>\n'
+        xml += '</category>\n'
+
+        # prepare the response for text/xml and add the xml
+        response = make_response(xml, 200)
+        response.headers['Content-Type'] = 'text/xml'
+        return response
+
+    if 'username' not in login_session:
+        # no username, generate a new random session state token
+        state = ''.join(random.choice
+                        (string.ascii_uppercase + string.digits)
+                        for x in xrange(32))
+        # set the state token to the newly generated state token
+        login_session['state'] = state
+        # no username as been set, display public access to page
+        return render_template('publicCategoryItemList.html',
+                               category=showCategory, items=showItems,
+                               STATE=state, CLIENT_ID=CLIENT_ID)
+    else:
+        email = login_session['email']
+        user_id = getUserID(email)
+        user = getUserInfo(user_id)
+        return render_template('categoryItemList.html', category=showCategory,
+                               items=showItems, user=user)
+
+
+# Delete Category endpoint
+@app.route('/category/<string:category_name>/delete/', methods=['GET', 'POST'])
+def deleteCategory(category_name):
+    if 'username' not in login_session:
+        # no username, generate a new random session state token
+        state = ''.join(random.choice
+                        (string.ascii_uppercase + string.digits)
+                        for x in xrange(32))
+        # set the state token to the newly generated state token
+        login_session['state'] = state
+        # no username as been set, access is restricted
+        return render_template('unauthorised.html', STATE=state,
+                               CLIENT_ID=CLIENT_ID)
+    else:
+        category = session.query(Category).filter_by(name=category_name).one()
+        email = login_session['email']
+        user_id = getUserID(email)
+        user = getUserInfo(user_id)
+        if login_session['user_id'] != category.creation_user.user_id:
+            # current user is not the use who created this item, prevent
+            # deletion and alert the current user.
+            responseScript = "<script>function myFunction() {alert('"
+            responseScript += "You are not authorized to delete this category."
+            responseScript += "');}</script><body onload='myFunction()''>"
+            return responseScript
+
+        if request.method == 'POST':
+            session.delete(category)
+            session.commit()
+            return redirect(url_for('showCategories'))
+        else:
+            return render_template('categoryDelete.html', category=category,
+                                   user=user)
 
 
 # Google OAuth Connect endpoint
@@ -222,557 +777,6 @@ def userLogout():
         del login_session['picture']
         return render_template('loggedOut.html', STATE=state,
                                CLIENT_ID=CLIENT_ID)
-
-
-# Current User Information endpoint
-@app.route('/user/profile')
-def userProfile():
-    if 'username' not in login_session:
-        # no username, generate a new random session state token
-        state = ''.join(random.choice
-                        (string.ascii_uppercase + string.digits)
-                        for x in xrange(32))
-        # set the state token to the newly generated state token
-        login_session['state'] = state
-        # no username as been set, access is restricted for this function
-        return render_template('unauthorised.html', STATE=state,
-                               CLIENT_ID=CLIENT_ID)
-    else:
-        email = login_session['email']
-        user_id = getUserID(email)
-        user = getUserInfo(user_id)
-        return render_template('userProfile.html', user=user)
-
-
-# Item Detail endpoint
-@app.route('/items/<item_name>/')
-def showItem(item_name):
-    item = session.query(Item).filter_by(name=item_name).one()
-    # the request specifies JSON as the desired response
-    if request.headers['Content-Type'] == 'application/json':
-        # JSONify the data
-        jsonResponse = jsonify(item=item.serialize)
-        # add the JSON data to the response with status OK
-        response = make_response(jsonResponse, 200)
-        # set the response header to JSON
-        response.headers['Content-Type'] = 'application/json'
-        return response
-
-    # the request specifies XML as the desired response
-    if request.headers['Content-Type'] == 'text/xml':
-        # standard XML header
-        xml = '<?xml version="1.0" encoding="UTF-8" ?>\n'
-        # define the XML template for a single item
-        xmlItem = "<item>\n\t<name>%(name)s</name>\n\t"
-        xmlItem += "<description>%(description)s</description>\n\t"
-        xmlItem += "<picture_url>%(picture_url)s</picture_url>\n\t"
-        xmlItem += "<category_id>%(category_id)s</category_id>\n\t"
-        xmlItem += "<creation_user_id>%(creation_user_id)s</creation_user_id>"
-        xmlItem += "\n\t\t<creation_date>%(creation_date)s</creation_date>\n"
-        xmlItem += "</item>"
-        # bind the data from the item class to use in the template
-        itemData = {'item_id': item.item_id,
-                    'name': item.name,
-                    'description': item.description,
-                    'picture_url': item.picture_url,
-                    'category_id': item.category_id,
-                    'creation_user_id': item.creation_user_id,
-                    'creation_date': item.creation_date}
-        # combine the template xml with the item data and add to
-        # the XML
-        xml += xmlItem % itemData
-        # add the XML to the response and set to be OK
-        response = make_response(xml, 200)
-        # set the content type of the response to be XML
-        response.headers['Content-Type'] = 'text/xml'
-        return response
-    if 'username' not in login_session:
-        # no username, generate a new random session state token
-        state = ''.join(random.choice
-                        (string.ascii_uppercase + string.digits)
-                        for x in xrange(32))
-        # set the state token to the newly generated state token
-        login_session['state'] = state
-        # no username as been set, display the public version
-        return render_template('publicItemDisplay.html', item=item,
-                               STATE=state, CLIENT_ID=CLIENT_ID)
-    else:
-        # username has been set, set the required values for the navbar
-        email = login_session['email']
-        user_id = getUserID(email)
-        user = getUserInfo(user_id)
-        # display the user only version of the page
-        return render_template('itemDisplay.html', item=item, user=user)
-
-
-# Edit Item endpoint
-@app.route('/items/<item_name>/edit/', methods=['GET', 'POST'])
-def editItem(item_name):
-    if 'username' not in login_session:
-        # no username, generate a new random session state token
-        state = ''.join(random.choice
-                        (string.ascii_uppercase + string.digits)
-                        for x in xrange(32))
-        # set the state token to the newly generated state token
-        login_session['state'] = state
-        # no username as been set, access restricted
-        return render_template('unauthorised.html', STATE=state,
-                               CLIENT_ID=CLIENT_ID)
-    else:
-        email = login_session['email']
-        user_id = getUserID(email)
-        user = getUserInfo(user_id)
-        categories = session.query(Category).all()
-        item = session.query(Item).filter_by(name=item_name).one()
-        itemCategory = session.query(Category).filter_by(
-            category_id=item.category_id).one()
-        owner = item.creation_user
-        if request.method == 'POST':
-            if owner.user_id != user.user_id:
-                return redirect(url_for('unauthorised.html'), STATE=state,
-                                CLIENT_ID=CLIENT_ID)
-            else:
-                editItemCategory = session.query(Category).filter_by(
-                    name=request.form['category']).one()
-                item.name = request.form['name']
-                item.description = request.form['description']
-                item.category_id = editItemCategory.category_id
-                return redirect(url_for('showItem', item_name=item.name))
-        else:
-            return render_template(
-                'itemEdit.html',
-                categories=categories,
-                item=item,
-                itemCategory=itemCategory,
-                user=user,
-                owner=owner)
-
-
-# Delete Item endpoint
-@app.route('/items/<item_name>/delete/', methods=['GET', 'POST'])
-def deleteItem(item_name):
-    if 'username' not in login_session:
-        # no username, generate a new random session state token
-        state = ''.join(random.choice
-                        (string.ascii_uppercase + string.digits)
-                        for x in xrange(32))
-        # set the state token to the newly generated state token
-        login_session['state'] = state
-        # no username as been set, access restricted
-        return render_template('unauthorised.html', STATE=state,
-                               CLIENT_ID=CLIENT_ID)
-    else:
-        # obtain user details
-        email = login_session['email']
-        user_id = getUserID(email)
-        user = getUserInfo(user_id)
-        # obtain item information
-        itemToDelete = session.query(Item).filter_by(name=item_name).one()
-        # confirm the user is allowed to delete this item
-        if login_session['user_id'] != itemToDelete.creation_user.user_id:
-            # current user is not the use who created this item, prevent
-            # deletion and alert the current user.
-            responseScript = "<script>function myFunction() {alert('"
-            responseScript += "You are not authorized to delete this item."
-            responseScript += "');}</script><body onload='myFunction()''>"
-            return responseScript
-
-        if request.method == 'POST':
-            # current user created the item, proceed to delete.
-            session.delete(itemToDelete)
-            session.commit()
-            return redirect(url_for('listItems'))
-        else:
-            # display the confirmation of deletion template to user.
-            return render_template('itemDelete.html', user=user,
-                                   item=itemToDelete)
-
-
-# New Item endpoint
-@app.route('/items/new/', methods=['GET', 'POST'])
-def newItem():
-    if 'username' not in login_session:
-        # no username, generate a new random session state token
-        state = ''.join(random.choice
-                        (string.ascii_uppercase + string.digits)
-                        for x in xrange(32))
-        # set the state token to the newly generated state token
-        login_session['state'] = state
-        # no username as been set, access is restricted for this function
-        return render_template('unauthorised.html', STATE=state,
-                               CLIENT_ID=CLIENT_ID)
-    else:
-        # collect user details from login session
-        email = login_session['email']
-        user_id = getUserID(email)
-        user = getUserInfo(user_id)
-        if request.method == 'POST':
-            # collect the file information from request
-            file = request.files['file']
-            if file is None and not allowedFile(file.filename):
-                # no image provided or invalid extension
-                # use the default blank image
-                picture_path = '/static/images/blank.png'
-            else:
-                # grab the extension of the file
-                extension = os.path.splitext(file.filename)[1]
-                # create a unique filename (UUID/GUID)
-                f_name = str(uuid.uuid4()) + extension
-                # save the new filename with the original extension
-                file.save(os.path.join(app.config['UPLOAD_FOLDER'], f_name))
-                # path of the picture to use for the template
-                picture_path = app.config['UPLOAD_FOLDER'] + f_name
-
-            # find the matching category from the picklist
-            category = session.query(Category).filter_by(
-                name=request.form['category']).one()
-            # create the new item with appropriate values
-            item = Item(name=request.form['name'],
-                        description=request.form['description'],
-                        category_id=category.category_id,
-                        creation_user=user,
-                        picture_url=picture_path)
-            # save the newly created item.
-            session.add(item)
-            session.commit()
-            # item added, go back and display the list of items
-            return redirect(url_for('listItems'))
-        else:
-            # query the database and get all categories to display in picklist
-            categories = session.query(Category).all()
-            # display the new item template
-            return render_template('itemNew.html',
-                                   categories=categories,
-                                   user=user)
-
-
-# Item List endpoint
-@app.route('/items/')
-def listItems():
-    items = session.query(Item).all()
-    # the request specifies JSON as the desired response
-    if request.headers['Content-Type'] == 'application/json':
-        # JSONify the data
-        jsonResponse = jsonify(items=[i.serialize for i in items])
-        # add the JSON data to the response with status OK
-        response = make_response(jsonResponse, 200)
-        # set the response header to JSON
-        response.headers['Content-Type'] = 'application/json'
-        return response
-
-    if request.headers['Content-Type'] == 'text/xml':
-        xml = '<?xml version="1.0" encoding="UTF-8" ?>\n<items>\n'
-        itemsXml = "\t<item>\n\t\t<name>%(name)s</name>\n\t\t"
-        itemsXml += "<description>%(description)s</description>\n\t\t"
-        itemsXml += "<picture_url>%(picture_url)s</picture_url>\n\t\t"
-        itemsXml += "<creation_user_id>%(creation_user_id)s</creation_user_id>"
-        itemsXml += "\n\t\t<creation_date>%(creation_date)s</creation_date>"
-        itemsXml += "\n\t</item>"
-        for item in items:
-            itemData = {'item_id': item.item_id,
-                        'name': item.name,
-                        'description': item.description,
-                        'picture_url': item.picture_url,
-                        'category_id': item.category_id,
-                        'creation_user_id': item.creation_user_id,
-                        'creation_date': item.creation_date}
-            xml += itemsXml % itemData
-        xml += "</items>"
-        response = make_response(xml, 200)
-        response.headers['Content-Type'] = 'text/xml'
-        return response
-    if 'username' not in login_session:
-        # no username, generate a new random session state token
-        state = ''.join(random.choice
-                        (string.ascii_uppercase + string.digits)
-                        for x in xrange(32))
-        # set the state token to the newly generated state token
-        login_session['state'] = state
-        # no username as been set, display public access to page
-        return render_template('publicItemList.html', items=items,
-                               STATE=state, CLIENT_ID=CLIENT_ID)
-    else:
-        email = login_session['email']
-        user_id = getUserID(email)
-        user = getUserInfo(user_id)
-        return render_template('itemList.html', items=items, user=user)
-
-
-# Default route, category listing
-@app.route('/')
-@app.route('/categories')
-def showCategories():
-    categories = session.query(Category).all()
-    # the request specifies JSON as the desired response
-    if request.headers['Content-Type'] == 'application/json':
-        # JSONify the data
-        jsonResponse = jsonify(categories=[c.serialize for c in categories])
-        # add the JSON data to the response with status OK
-        response = make_response(jsonResponse, 200)
-        # set the response header to JSON
-        response.headers['Content-Type'] = 'application/json'
-        return response
-
-    if request.headers['Content-Type'] == 'text/xml':
-        xml = '<?xml version="1.0" encoding="UTF-8" ?>\n'
-        xml += '<categories>\n'
-        catXml = '\t<category>\n'
-        catXml += '\t\t<category_id>%(category_id)s</category_id>\n'
-        catXml += '\t\t<name>%(name)s</name>\n'
-        catXml += '\t\t<description>%(description)s</description>\n'
-        catXml += '\t\t<creation_user_id>%(user_id)s</creation_user_id>\n'
-        catXml += '\t\t<creation_date>%(creation_date)s</creation_date>\n'
-        catXml += '\t</category>\n'
-        for category in categories:
-            catData = {'category_id': category.category_id,
-                       'name': category.name,
-                       'description': category.description,
-                       'user_id': category.creation_user_id,
-                       'creation_date': category.creation_date}
-            xml += catXml % catData
-        xml += '</categories>\n'
-        response = make_response(xml, 200)
-        response.headers['Content-Type'] = 'text/xml'
-        return response
-
-    if 'username' not in login_session:
-        # no username, generate a new random session state token
-        state = ''.join(random.choice
-                        (string.ascii_uppercase + string.digits)
-                        for x in xrange(32))
-        # set the state token to the newly generated state token
-        login_session['state'] = state
-        # no username as been set, display public access to page
-        return render_template('publicCategoryList.html',
-                               categories=categories, STATE=state,
-                               CLIENT_ID=CLIENT_ID)
-    else:
-        email = login_session['email']
-        user_id = getUserID(email)
-        user = getUserInfo(user_id)
-        return render_template('categoryList.html',
-                               categories=categories,
-                               user=user)
-
-
-# New Category endpoint
-@app.route('/categories/new/', methods=['GET', 'POST'])
-def newCategory():
-    if 'username' not in login_session:
-        # no username, generate a new random session state token
-        state = ''.join(random.choice
-                        (string.ascii_uppercase + string.digits)
-                        for x in xrange(32))
-        # set the state token to the newly generated state token
-        login_session['state'] = state
-        # no username as been set, access is restricted
-        return render_template('unauthorised.html', STATE=state,
-                               CLIENT_ID=CLIENT_ID)
-    else:
-        email = login_session['email']
-        user_id = getUserID(email)
-        user = getUserInfo(user_id)
-        if request.method == 'POST':
-            newCategory = Category(
-                name=request.form['name'],
-                description=request.form['description'])
-            session.add(newCategory)
-            session.commit()
-            return redirect(url_for('showCategories'))
-        else:
-            return render_template('categoryNew.html', user=user)
-
-
-# Edit Category endpoint
-@app.route('/category/<string:category_name>/edit/', methods=['GET', 'POST'])
-def editCategory(category_name):
-    if 'username' not in login_session:
-        # no username, generate a new random session state token
-        state = ''.join(random.choice
-                        (string.ascii_uppercase + string.digits)
-                        for x in xrange(32))
-        # set the state token to the newly generated state token
-        login_session['state'] = state
-        # no username as been set, access is restricted.
-        return render_template(
-            'unauthorised.html',
-            STATE=state,
-            CLIENT_ID=CLIENT_ID)
-    else:
-        email = login_session['email']
-        user_id = getUserID(email)
-        user = getUserInfo(user_id)
-        editedCategory = session.query(
-            Category).filter_by(name=category_name).one()
-        owner = editedCategory.creation_user
-        if request.method == 'POST':
-            if owner.user_id != user.user_id:
-                return redirect(
-                    url_for('unauthorised.html'),
-                    STATE=state,
-                    CLIENT_ID=CLIENT_ID)
-            else:
-                editedCategory.name = request.form['name']
-                editedCategory.description = request.form['description']
-                return redirect(url_for('showCategories'))
-        else:
-            return render_template(
-                'categoryEdit.html',
-                category=editedCategory,
-                user=user)
-
-
-# showCategory
-@app.route('/category/<string:category_name>/')
-def showCategory(category_name):
-    showCategory = session.query(Category).filter_by(name=category_name).one()
-    showItems = session.query(Item).filter_by(
-        category_id=showCategory.category_id).all()
-    # the request specifies JSON as the desired response
-    if request.headers['Content-Type'] == 'application/json':
-        # JSONify the data
-        jsonResponse = jsonify(category=showCategory.serialize,
-                               items=[i.serialize for i in showItems])
-        # add the JSON data to the response with status OK
-        response = make_response(jsonResponse, 200)
-        # set the response header to JSON
-        response.headers['Content-Type'] = 'application/json'
-        return response
-
-    # XML
-    if request.headers['Content-Type'] == 'text/xml':
-        #
-        xml = '<?xml version="1.0" encoding="UTF-8" ?>\n'
-        catXml = '<category>\n'
-        catXml += '\t<category_id>%(category_id)s</category_id>\n'
-        catXml += '\t<name>%(name)s</name>\n'
-        catXml += '\t<description>%(description)s</description>\n'
-        catXml += '\t<creation_user_id>%(user_id)s</creation_user_id>\n'
-        catXml += '\t<creation_date>%(creation_date)s</creation_date>\n'
-        catXml += '\t<items>\n'
-
-        itemXml = "\t<item>\n\t\t<name>%(name)s</name>\n\t\t"
-        itemXml += "<description>%(description)s</description>\n\t\t"
-        itemXml += "<picture_url>%(picture_url)s</picture_url>\n\t\t"
-        itemXml += "<creation_user_id>%(creation_user_id)s</creation_user_id>"
-        itemXml += "\n\t\t<creation_date>%(creation_date)s</creation_date>"
-        itemXml += "\n\t</item>"
-        # bind the category data for use in template
-        catData = {'category_id': showCategory.category_id,
-                   'name': showCategory.name,
-                   'description': showCategory.description,
-                   'user_id': showCategory.creation_user_id,
-                   'creation_date': showCategory.creation_date}
-        # merge the category data with the xml template into xml response
-        xml += catXml % catData
-
-        # iterate through each item and add it to the xml response
-        for item in showItems:
-            itemData = {'item_id': item.item_id,
-                        'name': item.name,
-                        'description': item.description,
-                        'picture_url': item.picture_url,
-                        'category_id': item.category_id,
-                        'creation_user_id': item.creation_user_id,
-                        'creation_date': item.creation_date}
-            # merge the item data with the template and add to xml
-            xml += itemXml % itemData
-
-        # close off the item and category tags
-        xml += '\t</items>\n'
-        xml += '</category>\n'
-
-        # prepare the response for text/xml and add the xml
-        response = make_response(xml, 200)
-        response.headers['Content-Type'] = 'text/xml'
-        return response
-
-    if 'username' not in login_session:
-        # no username, generate a new random session state token
-        state = ''.join(random.choice
-                        (string.ascii_uppercase + string.digits)
-                        for x in xrange(32))
-        # set the state token to the newly generated state token
-        login_session['state'] = state
-        # no username as been set, display public access to page
-        return render_template(
-            'publicCategoryItemList.html',
-            category=showCategory,
-            items=showItems,
-            STATE=state,
-            CLIENT_ID=CLIENT_ID)
-    else:
-        email = login_session['email']
-        user_id = getUserID(email)
-        user = getUserInfo(user_id)
-        return render_template(
-            'categoryItemList.html',
-            category=showCategory,
-            items=showItems,
-            user=user)
-
-
-# showCategoryItems
-@app.route('/category/<string:category_name>/items/')
-def showCategoryItems(category_name):
-    showCategory = session.query(Category).filter_by(name=category_name).one()
-    showItems = session.query(Item).filter_by(
-        category_id=showCategory.category_id).all()
-    if 'username' not in login_session:
-        # no username, generate a new random session state token
-        state = ''.join(random.choice
-                        (string.ascii_uppercase + string.digits)
-                        for x in xrange(32))
-        # set the state token to the newly generated state token
-        login_session['state'] = state
-        # no username as been set, display public access to page
-        return render_template(
-            'publicCategoryItemList.html',
-            category=showCategory,
-            items=showItems,
-            STATE=state,
-            CLIENT_ID=CLIENT_ID)
-    else:
-        email = login_session['email']
-        user_id = getUserID(email)
-        user = getUserInfo(user_id)
-        return render_template(
-            'categoryItemList.html',
-            category=showCategory,
-            items=showItems,
-            user=user)
-
-
-# Delete Category endpoint
-@app.route('/category/<string:category_name>/delete/', methods=['GET', 'POST'])
-def deleteCategory(category_name):
-    if 'username' not in login_session:
-        # no username, generate a new random session state token
-        state = ''.join(random.choice
-                        (string.ascii_uppercase + string.digits)
-                        for x in xrange(32))
-        # set the state token to the newly generated state token
-        login_session['state'] = state
-        # no username as been set, access is restricted
-        return render_template('unauthorised.html', STATE=state,
-                               CLIENT_ID=CLIENT_ID)
-    else:
-        category = session.query(Category).filter_by(name=category_name).one()
-        owner = category.creation_user
-        email = login_session['email']
-        user_id = getUserID(email)
-        user = getUserInfo(user_id)
-        if request.method == 'POST':
-            if owner.user_id != user.user_id:
-                return redirect(url_for('unauthorised.html'), STATE=state,
-                                CLIENT_ID=CLIENT_ID)
-            else:
-                session.delete(category)
-                session.commit()
-                return redirect(url_for('showCategories'))
-        else:
-            return render_template('categoryDelete.html', category=category,
-                                   user=user)
 
 
 if __name__ == "__main__":
